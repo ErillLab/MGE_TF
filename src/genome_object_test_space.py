@@ -333,40 +333,6 @@ plt.show()
 
 
 
-'''
-class TryGenome(SeqRecord):
-    
-    def new_method(self):
-        print('new method')
-
-
-class OldGenome():
-    
-    def __init__(self, SR):
-        self.annotations = SR.annotations
-        self.dbxrefs = SR.dbxrefs
-        self.description = SR.description
-        self.features = SR.features
-        self.format = SR.format
-        self.id = SR.id
-        self.letter_annotations = SR.letter_annotations
-        self.lower = SR.lower
-        self.name = SR.name
-        self.reverse_complement = SR.reverse_complement
-        self.seq = SR.seq
-        self.translate = SR.translate
-        self.upper = SR.upper
-    
-    def new_method(self):
-        print('new method')
-'''
-
-
-
-
-
-
-
 
 
 
