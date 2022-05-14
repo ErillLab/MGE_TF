@@ -195,7 +195,7 @@ class Genome():
         
         if threshold:
             hits_scores = effective_scores[effective_scores > threshold]
-            hits_positions = np.asarray(np.argwhere(effective_scores > threshold))
+            hits_positions = np.argwhere(effective_scores > threshold).flatten()
             self.hits = {'scores': hits_scores,
                          'positions': hits_positions,
                          'threshold': threshold}
@@ -348,121 +348,134 @@ class Genome():
         
         return norm_gini
     
-    def get_hits_distances(self, hits_positions, sequence_length, circular=True):
+    def get_hits_distances(self, circular=True):
         
         distances = []
+        hits_positions = self.hits['positions']
         for i in range(len(hits_positions)):
             if i == 0:
-                distance = sequence_length - hits_positions[-1] + hits_positions[i]
+                distance = self.length - hits_positions[-1] + hits_positions[i]
             else:
                 distance = hits_positions[i] - hits_positions[i-1]
             distances.append(distance)
         return distances
 
-    def get_original_evenness(self, hits_positions, sequence_length):
+    def get_original_evenness(self):
         
-        if len(hits_positions) < 2:
+        if len(self.hits['positions']) < 2:
             return 'Not enough sites'
         
-        intervals = self.get_hits_distances(hits_positions, sequence_length)
+        intervals = self.get_hits_distances()
         return np.var(intervals)
 
-    def get_norm_evenness(self, hits_positions, sequence_length):
+    def get_norm_evenness(self):
         
-        if len(hits_positions) < 2:
+        if len(self.hits['positions']) < 2:
             return 'Not enough sites'
         
-        intervals = self.get_hits_distances(hits_positions, sequence_length)
-        
+        intervals = self.get_hits_distances()
         n_intervals = len(intervals)
         mean = np.mean(intervals)
         var = np.var(intervals)
-        max_var = ((n_intervals - 1) * mean**2 + (sequence_length - mean)**2)/n_intervals
+        max_var = ((n_intervals - 1) * mean**2 + (self.length - mean)**2)/n_intervals
         norm_var = var / max_var
         return norm_var
 
-    def get_new_evenness(self, hits_positions, sequence_length):
+    def get_new_evenness(self):
         
-        if len(hits_positions) < 2:
+        if len(self.hits['positions']) < 2:
             return 'Not enough sites'
         
-        norm_var = self.get_norm_evenness(hits_positions, sequence_length)
+        norm_var = self.get_norm_evenness()
         # Transform so that large evenness values mean very even distribution
         # (it's the opposite in the original evenness definition)
         new_evenness = 1 - norm_var
         return new_evenness
-        
-    def analyze_putative_sites(self, n_bins, use_double_binning=True):
+    
+    def analyze_scores(self):
         
         if not self.hits:
             raise TypeError(
                 "The 'hits' attribute is 'NoneType'. Make sure you call the\
                 'scan' method specifying a threshold to get PSSM-hits before\
-                calling 'analyze_putative_sites'.")
+                calling 'analyze_positional_distribution'.")
+                
+        # Set average score
+        self.avg_score = self.hits['scores'].mean()
+        # Set extrmeness
+        self.extremeness = (self.hits['scores'] - self.hits['threshold']).sum()
+    
+    def set_counts(self, n_bins, use_double_binning):
         
-        # Number of sites
-        hits_scores = self.hits['scores']
-        hits_positions = self.hits['positions']
-        genome_length = self.length
-        
-        n_sites = len(hits_scores)
-        # Site density (sites per thousand bp)
-        site_density = 1000 * n_sites / genome_length
-        # Average score
-        avg_score = hits_scores.mean()
-        # Extrmeness
-        extremeness = (hits_scores - self.hits['threshold']).sum()
-        
-        # Study positional distribution
         # Counts in each bin (for Entropy and Gini)
-        counts, bins = np.histogram(hits_positions, bins=n_bins, range=(0,genome_length))
-        # Entropy, Gini, Evenness
-        entr = self.get_entropy(counts)  # Positional entropy
-        norm_entr = self.get_norm_entropy(counts)  # Normalized positional entropy
-        gini = self.get_gini_coeff(counts)  # Gini coefficient
-        norm_gini = self.get_norm_gini_coeff(counts)  # Normalized Gini coefficient
+        counts, bins = np.histogram(
+            self.hits['positions'], bins=n_bins, range=(0, self.length))
+        counts_shifted = None
         
         if use_double_binning:
             # The coordinate system will be shifted by half the bin size
             half_bin_size = int((bins[1] - bins[0])/2)
-            # Change coordinates (the start point moved from 0 to half_bin_size)
+            # Change coordinates (start point moved from 0 to half_bin_size)
             shifted_matches_positions = []
-            for m_pos in hits_positions:
+            for m_pos in self.hits['positions']:
                 shifted_m_pos = m_pos - half_bin_size
                 if shifted_m_pos < 0:
-                    shifted_m_pos += genome_length
+                    shifted_m_pos += self.length
                 shifted_matches_positions.append(shifted_m_pos)
             shifted_matches_positions.sort()   
             # Counts in each shifted bin (for Entropy and Gini)
-            counts_sh, bins_sh = np.histogram(
-                shifted_matches_positions, bins=n_bins, range=(0,genome_length))
-            # Entropy, Gini, Evenness
-            entr_sh = self.get_entropy(counts_sh)
-            norm_entr_sh = self.get_norm_entropy(counts_sh)
-            gini_sh = self.get_gini_coeff(counts_sh)
-            norm_gini_sh = self.get_norm_gini_coeff(counts_sh)
+            counts_shifted, bins_shifted = np.histogram(
+                shifted_matches_positions, bins=n_bins, range=(0, self.length))
+        
+        self.counts = {'regular_binning': counts,
+                       'shifted_binning': counts_shifted}
+    
+    def analyze_positional_distribution(self, n_bins, use_double_binning=True):
+        
+        if not self.hits:
+            raise TypeError(
+                "The 'hits' attribute is 'NoneType'. Make sure you call the\
+                'scan' method specifying a threshold to get PSSM-hits before\
+                calling 'analyze_positional_distribution'.")
+        
+        
+        # Number of predicted binding sites
+        self.n_sites = len(self.hits['scores'])
+        # Site density (sites per thousand bp)
+        self.site_density = 1000 * self.n_sites / self.length
+        
+        # Set counts (regular binning and shifted binning)
+        self.set_counts(n_bins, use_double_binning)
+        counts_regular, counts_shifted = self.counts.values()
+        
+        # Entropy, Normalized entropy, Gini, Normalized Gini (regular frame)
+        entr = self.get_entropy(counts_regular)
+        norm_entr = self.get_norm_entropy(counts_regular)
+        gini = self.get_gini_coeff(counts_regular)
+        norm_gini = self.get_norm_gini_coeff(counts_regular)
+        
+        if use_double_binning:
+            # Entropy, Normalized entropy, Gini, Normalized Gini (shifted frame)
+            entr_sh = self.get_entropy(counts_shifted)
+            norm_entr_sh = self.get_norm_entropy(counts_shifted)
+            gini_sh = self.get_gini_coeff(counts_shifted)
+            norm_gini_sh = self.get_norm_gini_coeff(counts_shifted)
+            
             # Chose frame that detects clusters the most
             entr = min(entr, entr_sh)
             norm_entr = min(norm_entr, norm_entr_sh)
             gini = max(gini, gini_sh)
             norm_gini = max(norm_gini, norm_gini_sh)
         
-        # Evenness
-        even = self.get_original_evenness(hits_positions, genome_length)
-        new_even = self.get_new_evenness(hits_positions, genome_length)
-        
-        # Set results of the analysis
-        self.n_sites = n_sites
-        self.site_density = site_density
-        self.avg_score = avg_score
-        self.extremeness = extremeness
-        self.counts = counts
+        # Set entropy, normalized entropy, Gini and normalized Gini
         self.entropy = entr
         self.norm_entropy = norm_entr
         self.gini = gini
         self.norm_gini = norm_gini
-        self.evenness = even
-        self.new_evenness = new_even
+        
+        # Set original evenness and new evenness
+        self.evenness = self.get_original_evenness()
+        self.new_evenness = self.get_new_evenness()
         
 
 
@@ -480,7 +493,8 @@ print('Description:', my_genome.description)
 print('ID:', my_genome.id)
 
 my_genome.scan(motif, 0.5, 8.25)
-my_genome.analyze_putative_sites(50)
+my_genome.analyze_scores()
+my_genome.analyze_positional_distribution(50)
 
 # Print Norm Gini
 print('Normalized Gini:', my_genome.norm_gini)
