@@ -14,7 +14,7 @@ class Genome():
         
         SR = SeqIO.read(filepath, fileformat)
         # For traceability
-        self.source = filepath
+        self.source = (filepath, fileformat)
         
         # SeqRecord
         self.seq = SR.seq
@@ -227,7 +227,11 @@ class Genome():
         return distances
 
     def get_original_evenness(self):
-        
+        '''
+        Evenness as defined in Philip and Freeland (2011).
+        It's the variance of the distances between consecutive (sorted)
+        datapoints.
+        '''
         if len(self.hits['positions']) < 2:
             return 'Not enough sites'
         
@@ -235,14 +239,18 @@ class Genome():
         return np.var(intervals)
 
     def get_norm_evenness(self):
-        
+        '''
+        Normalize evenness.
+        Norm_Evenness = Evenness / Max_Evenness
+        '''
         if len(self.hits['positions']) < 2:
             return 'Not enough sites'
         
         intervals = self.get_hits_distances()
-        n_intervals = len(intervals)
-        mean = np.mean(intervals)
         var = np.var(intervals)
+        
+        n_intervals = len(intervals)
+        mean = self.length/n_intervals
         max_var = ((n_intervals - 1) * mean**2 + (self.length - mean)**2)/n_intervals
         norm_var = var / max_var
         return norm_var
