@@ -29,8 +29,14 @@ class Genome():
         
         # Additional attributes
         self.length = len(SR.seq)
+        self.genomic_units = {'bounds': None, 'coding': None}
         self.pssm_scores = None
-        self.hits = None
+        self.hits = {'scores': None,
+                     'positions': None,
+                     'threshold': None,
+                     'motif_length': None,
+                     'intergenic': None,
+                     'closest_genes': None}
         self.n_sites = None
         self.site_density = None
         self.avg_score = None
@@ -43,6 +49,53 @@ class Genome():
         self.evenness = None
         self.new_evenness = None
         self.intergenicity = None
+        
+        # Features considered as 'coding' => When a site falls within one of
+        # those features it is considered 'intergenic'.
+        self.coding_feat = ['CDS','rRNA','tRNA','ncRNA','preRNA','tmRNA','misc']
+        
+        # Set genomic units, used to generate psudogenomes and to define
+        # intergenic sites
+        self.set_genomic_units()
+    
+    def set_genomic_units(self):
+        '''
+        Sets the  genomic_units  attribute.
+        genomic_units  has two keys:
+            "bounds": list of the bounds that can be used to split the genome
+                      into units. The first and last bounds are the start and
+                      the end of the genome.
+            "coding": array of booleans of length n, where n is the number of
+                      units. The i-th element is True when the i-th unit is
+                      a coding unit, False otherwise.
+        '''
+        
+        # Define bounds of units
+        units_bounds = [0, self.length]
+        coding_regions = []
+        for feat in self.features:
+            start, end = int(feat.location.start), int(feat.location.end)
+            units_bounds.append(start)
+            units_bounds.append(end)
+            if feat.type in self.coding_feat:
+                coding_regions.append([start, end])
+        units_bounds = list(set(units_bounds))
+        units_bounds.sort()
+        
+        # Check what units are 'coding'
+        n_units = len(units_bounds) - 1
+        coding_units = np.array([False] * n_units)
+        for cod_reg in coding_regions:
+            start, end = cod_reg
+            unit_idx_start = units_bounds.index(start)
+            unit_idx_end = units_bounds.index(end)
+            coding_units[unit_idx_start:unit_idx_end] = True
+        
+        self.genomic_units['bounds'] = units_bounds
+        self.genomic_units['coding'] = coding_units
+    
+    # !!! Modify intergenicity analysis to exploit the new genomic_units attribute
+    # instead of looping every time through the locations of the features
     
     def scan(self, motif, pseudocount, threshold=None):
         pwm = motif.counts.normalize(pseudocounts=pseudocount)
@@ -61,10 +114,10 @@ class Genome():
         if threshold:
             hits_scores = effective_scores[effective_scores > threshold]
             hits_positions = np.argwhere(effective_scores > threshold).flatten()
-            self.hits = {'scores': hits_scores,
-                         'positions': hits_positions,
-                         'threshold': threshold,
-                         'motif_length': pssm.length}
+            self.hits['scores'] = hits_scores
+            self.hits['positions'] = hits_positions
+            self.hits['threshold'] = threshold
+            self.hits['motif_length'] = pssm.length
         
     def combine_f_and_r_scores(self, f_scores, r_scores):
         '''
@@ -450,26 +503,17 @@ class Genome():
         
         return distance
     
-    def get_genetic_context(self, site_pos):
-        
-        intergenic = True
+    def get_closest_gene(self, site_pos):
         
         genes = []
         distances = []
         for feat in self.features:
-            # Ignore the feature if it's not 'CDS' nor 'tRNA' nor 'rRNA'
-            if feat.type not in ['CDS', 'tRNA', 'rRNA']:  # !!! other feat types ...
+            # Ignore the feature if it's not 'coding'.
+            if feat.type not in self.coding_feat:
                 continue
             
             # Distance (from gene start to site)
-            distance = self.gene_to_site_distance(
-                feat, site_pos, circular_genome=True)  # !!! circular genome?
-            
-            # As soon as one gene is found to overlap with the hit, the
-            # variable  intergenic  is set to False.
-            if self.overlaps_with_feature(site_pos, feat):
-                intergenic = False
-            
+            distance = self.gene_to_site_distance(feat, site_pos, circular_genome=True)  # !!! circular genome?
             genes.append(feat)
             distances.append(distance)
         
@@ -477,14 +521,11 @@ class Genome():
             # Get closest gene record
             abs_distances = [abs(x) for x in distances]
             j = np.argmin(abs_distances)  # j-th element was the closest gene
-            closest_gene = genes[j]  # j-th gene was the closest gene
+            return genes[j]  # j-th gene was the closest gene
         else:
-            intergenic = 'no_genes'
-            closest_gene = 'no_genes'
-        
-        return intergenic, closest_gene
+            return 'no_genes'
     
-    def set_hits_genetic_context(self):
+    def set_hits_closest_genes(self):
         
         if not self.hits:
             raise TypeError(
@@ -492,14 +533,35 @@ class Genome():
                 'scan' method specifying a threshold to get PSSM-hits before\
                 calling 'get_intergenicity'.")
         
-        intergenic_list = []
-        closest_gene_list = []
-        for hit_pos in self.hits['positions']:
-            intergenic, closest_gene = self.get_genetic_context(hit_pos)
-            intergenic_list.append(intergenic)
-            closest_gene_list.append(closest_gene)
-        self.hits['intergenic'] = intergenic_list
-        self.hits['closest_genes'] = closest_gene_list
+        if sum(self.genomic_units['coding']) == 0:
+            self.hits['closest_genes'] = 'no_genes'
+        
+        else:
+            self.hits['closest_genes'] = []
+            for hit_pos in self.hits['positions']:
+                closest_gene = self.get_closest_gene(hit_pos)
+                self.hits['closest_genes'].append(closest_gene)
+    
+    def is_intergenic(self, hit_pos):
+        idx_right_bound = np.searchsorted(self.genomic_units['bounds'], hit_pos)
+        idx_unit = idx_right_bound - 1
+        return self.genomic_units['coding'][idx_unit]
+    
+    def set_hits_intergenic(self):
+        
+        if not self.hits:
+            raise TypeError(
+                "The 'hits' attribute is 'NoneType'. Make sure you call the\
+                'scan' method specifying a threshold to get PSSM-hits before\
+                calling 'get_intergenicity'.")
+        
+        if sum(self.genomic_units['coding']) == 0:
+            self.hits['intergenic'] = 'no_genes'
+        
+        else:
+            self.hits['intergenic'] = []
+            for hit_pos in self.hits['positions']:
+                self.hits['intergenic'].append(self.is_intergenic(hit_pos))
     
     def analyze_intergenicity(self):
         
@@ -510,12 +572,12 @@ class Genome():
                 calling 'get_intergenicity'.")
         
         # Identify genetic context for each hit
-        self.set_hits_genetic_context()
+        self.set_hits_intergenic()
         
         if self.n_sites == 0:
             return 'no_hits'
         
-        if self.hits['intergenic'][0] == 'no_genes':
+        if self.hits['intergenic'] == 'no_genes':
             return 'no_genes'
         
         # Count number of intergenic sites
@@ -524,6 +586,9 @@ class Genome():
         intergenic_freq = n_intergenic / self.n_sites
         # Set intergenicity attribute
         self.intergenicity = intergenic_freq
+    
+    
+    
 
 
 
