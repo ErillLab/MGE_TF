@@ -45,9 +45,10 @@ class MGE():
         pseudogenome = copy.deepcopy(self.original)
         self.clear_stats(pseudogenome)
         pseudogenome.seq = Seq("")
-        units_bounds = pseudogenome.genomic_units['bounds']  # Make genomic_units an attribute of MGE?
+        units_bounds = pseudogenome.genomic_units['bounds']
         for i in range(len(units_bounds)-1):
-            unit = pseudogenome.seq[units_bounds[i]: units_bounds[i+1]]
+            unit = self.original.seq[units_bounds[i]: units_bounds[i+1]]
+            print(unit[:5])  # !!!
             pseudogenome.seq += self.get_k_sampled_sequence(unit, kmer_len)
         
         # The permuted genome is assigned a unique ID
