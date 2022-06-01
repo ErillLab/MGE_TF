@@ -18,7 +18,7 @@ class MGE():
         self.original = Genome(filepath, fileformat)
         self.pseudogenomes = []
         self.source = (filepath, fileformat)
-        self.perm_counter = 0
+        self.pseudo_g_counter = 0
         
         # p-values
         self.n_sites = None
@@ -48,19 +48,19 @@ class MGE():
         units_bounds = pseudogenome.genomic_units['bounds']  # Make genomic_units an attribute of MGE?
         for i in range(len(units_bounds)-1):
             unit = pseudogenome.seq[units_bounds[i]: units_bounds[i+1]]
-            pseudogenome.seq += self.get_shuffled_sequence(unit, kmer_len)
+            pseudogenome.seq += self.get_k_sampled_sequence(unit, kmer_len)
         
         # The permuted genome is assigned a unique ID
-        self.increase_perm_counter()
-        pseudogenome.id = str(pseudogenome.id) + '_perm_' + str(self.perm_counter)
-        pseudogenome.name = str(pseudogenome.name) + ' perm_' + str(self.perm_counter)
-        pseudogenome.description = str(pseudogenome.description) + ' perm_' + str(self.perm_counter)
+        self.increase_pseudo_g_counter()
+        pseudogenome.id = str(pseudogenome.id) + '_' + str(self.pseudo_g_counter)
+        pseudogenome.name = str(pseudogenome.name) + ' pseudo_' + str(self.pseudo_g_counter)
+        pseudogenome.description = str(pseudogenome.description) + 'pseudo_' + str(self.pseudo_g_counter)
         return pseudogenome
     
-    def increase_perm_counter(self):
-        self.perm_counter += 1
+    def increase_pseudo_g_counter(self):
+        self.pseudo_g_counter += 1
     
-    def get_shuffled_sequence(self, sequence, k):
+    def get_k_sampled_sequence(self, sequence, k):
         '''
         All kmers are stored. Than sampled without replacement.
         Example with k = 3:
@@ -78,17 +78,15 @@ class MGE():
             n_nuclotides_rem = len(sequence) % k
             
             all_kmers = self.get_all_kmers(sequence, k)
-            control_genome_list = random.sample(all_kmers, n_kmers)
+            sampled_seq_list = random.sample(all_kmers, n_kmers)
             n_nucleotides = random.sample(str(sequence), n_nuclotides_rem)
-            control_genome_list += n_nucleotides
-            control_genome_str = "".join(control_genome_list)
-            control_genome_seq = Seq(control_genome_str)
-            return control_genome_seq
+            sampled_seq_list += n_nucleotides
         
         else:
-            shuffled_seq_list = random.sample(str(sequence), len(sequence))
-            shuffled_seq = Seq("".join(shuffled_seq_list))
-            return shuffled_seq
+            sampled_seq_list = random.sample(str(sequence), len(sequence))
+        
+        sampled_seq = Seq("".join(sampled_seq_list))
+        return sampled_seq
     
     def get_all_kmers(self, seq, k):
         '''
@@ -145,11 +143,17 @@ class MGE():
         hypothesis. The estimate is based on the frequency of pseudogenomes
         that can reproduce the results observed on the original genome.
         '''
+        
         control_values = []
         for genome in self.pseudogenomes:
             control_values.append(vars(genome)[metric])
-        obs = vars(self.original)[metric]
+        
+        if None in control_values:
+            raise ValueError('The value of ' + str(metric) +
+                             ' is not set for all pseudogenomes.')
         control = np.array(control_values)
+        obs = vars(self.original)[metric]
+        
         if alternative == 'greater':
             p_val = (control >= obs).sum()/len(control)
         elif alternative == 'smaller':
@@ -160,9 +164,6 @@ class MGE():
         vars(self)[metric] = p_val
 
     
-
-
-
 
 
 
