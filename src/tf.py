@@ -19,7 +19,10 @@ class TF():
         self.permuted = None
         self.source = (filepath, fileformat)
         self.perm_counter = 0
-        self.n_instances = 100  # !!! Set from config
+        self.patser_threshold = None
+        self.n_fake_instances = 100  # !!! Set from config
+        self.pseudocount_value = 0.5  # !!! Set from config
+        self.set_threshold()
     
     
     # Loading motifs
@@ -83,14 +86,14 @@ class TF():
     def get_fake_instances_from_pwm(self, motif_pwm):
         '''
         Generates fake instances from a pwm. The frequencies in the PWM are
-        rounded to become multiples of 1/n_instances.
+        rounded to become multiples of 1/n_fake_instances.
         The sum of the weights in each column is controlled by applying the
         "Largest Remainder Method". In this way, the sum of the frequencies is
         guaranteed to be 1 even after the rounding. A list of Bio Seq objects
         is returned (a list of "fake instances" for the motif).
         '''
         pwm_array = self.get_2d_array(motif_pwm)  # As 2D numpy array
-        matrix = pwm_array * self.n_instances
+        matrix = pwm_array * self.n_fake_instances
         counts_matrix = np.apply_along_axis(self.round_column, 0, matrix)
         instances = self.get_fake_instances_from_counts_matrix(counts_matrix)
         return instances
@@ -105,7 +108,7 @@ class TF():
         '''
         truncated = np.floor(column).astype(int)
         order = np.flip(np.argsort(column - truncated))
-        remainder = self.n_instances - sum(truncated)
+        remainder = self.n_fake_instances - sum(truncated)
         for i in range(remainder):
             truncated[order[i]] += 1
         return truncated
@@ -136,6 +139,29 @@ class TF():
         ''' Converts a 1D array to a string. '''
         return ''.join(list(row))
     
+    
+    # Set threshold
+    
+    def set_threshold(self):
+        '''
+        The threshold is defined so that it satisfyies (roughly) the equality
+        between the −log of the false-positive rate and the information content,
+        as proposed in
+        
+        Hertz GZ, Stormo GD. Identifying DNA and protein patterns with
+        statistically significant alignments of multiple sequences.
+        Bioinformatics. 1999 Jul-Aug;15(7-8):563-77.
+        doi: 10.1093/bioinformatics/15.7.563. PMID: 10487864.
+        
+        This method is used in patser software by G. Z. Hertz, and
+        threshold_patser (used here) mimcs that.
+        '''
+        
+        pwm = self.original.counts.normalize(pseudocounts=self.pseudocount_value)
+        pssm = pwm.log_odds()
+        distribution = pssm.distribution(precision=10**4)
+        threshold = distribution.threshold_patser()
+        self.patser_threshold = threshold
     
     # Permuting motifs
     
