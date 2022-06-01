@@ -115,9 +115,9 @@ class MGE():
         Scans the original genome and all the pseudogenomes with the PSSM of a
         given motif.
         '''
-        self.original.scan(motif, pseudocount, threshold=None)
+        self.original.scan(motif, pseudocount, threshold=threshold)
         for pg in self.pseudogenomes:
-            pg.scan(motif, pseudocount, threshold=None)
+            pg.scan(motif, pseudocount, threshold=threshold)
     
     def analyze_scores(self):
         ''' Sets the p-value for the statistics related to the PSSM-scores. '''
