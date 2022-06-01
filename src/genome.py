@@ -94,9 +94,6 @@ class Genome():
         self.genomic_units['bounds'] = units_bounds
         self.genomic_units['coding'] = coding_units
     
-    # !!! Modify intergenicity analysis to exploit the new genomic_units attribute
-    # instead of looping every time through the locations of the features
-    
     def scan(self, motif, pseudocount, threshold=None):
         pwm = motif.counts.normalize(pseudocounts=pseudocount)
         rpwm = pwm.reverse_complement()
@@ -267,8 +264,10 @@ class Genome():
         
         return norm_gini
     
-    def get_hits_distances(self, circular=True):
-        
+    def get_hits_distances(self):
+        '''
+        Returns the distance (in bp) between consecutive hits on the genome.
+        '''
         distances = []
         hits_positions = self.hits['positions']
         for i in range(len(hits_positions)):
@@ -293,7 +292,7 @@ class Genome():
 
     def get_norm_evenness(self):
         '''
-        Normalize evenness.
+        Normalized evenness.
         Norm_Evenness = Evenness / Max_Evenness
         '''
         if len(self.hits['positions']) < 2:
@@ -309,13 +308,15 @@ class Genome():
         return norm_var
 
     def get_new_evenness(self):
-        
+        '''
+        A transformation is applied so that large evenness values imply a very
+        even distribution (it's the opposite in the original definition of
+        evenness by Philip and Freeland).
+        '''
         if len(self.hits['positions']) < 2:
             return 'Not enough sites'
         
         norm_var = self.get_norm_evenness()
-        # Transform so that large evenness values mean very even distribution
-        # (it's the opposite in the original evenness definition)
         new_evenness = 1 - norm_var
         return new_evenness
     
@@ -545,7 +546,7 @@ class Genome():
     def is_intergenic(self, hit_pos):
         idx_right_bound = np.searchsorted(self.genomic_units['bounds'], hit_pos)
         idx_unit = idx_right_bound - 1
-        return self.genomic_units['coding'][idx_unit]
+        return not self.genomic_units['coding'][idx_unit]
     
     def set_hits_intergenic(self):
         

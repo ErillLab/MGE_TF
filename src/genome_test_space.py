@@ -6,14 +6,13 @@
 
 import numpy as np
 from Bio import SeqIO
-
-
-# Motif related code pasted here for testing purposes -------------------------
-
+import time
 from Bio.Seq import Seq
 from Bio import motifs
 import warnings
+import matplotlib.pyplot as plt
 
+# Motif related code pasted here for testing purposes -------------------------
 
 N_INSTANCES = 100
 
@@ -148,6 +147,9 @@ def load_motif(filepath):
 
 from genome import Genome
 
+# TEST Genome
+# -----------
+
 # CtrA motif
 motif = load_motif('../datasets/TF_binding_motifs/CtrA.fasta')
 
@@ -171,8 +173,6 @@ print('Intergenic freq:', my_genome.intergenicity)
 
 
 # Plot positional distribution as histogram
-import matplotlib.pyplot as plt
-
 plt.hist(my_genome.hits['positions'], bins=8)
 plt.title('CtrA sites distribution for\n' + my_genome.description)
 plt.xlabel('genomic positions')
@@ -180,9 +180,42 @@ plt.ylabel('CtrA sites counts')
 plt.show()
 
 
+# TEST MGE
+# --------
+
+from mge import MGE
 
 
+# CtrA motif
+ctra_motif = load_motif('../datasets/TF_binding_motifs/CtrA.fasta')
 
+# Custom Genome class for KY555145
+my_mge = MGE('../datasets/MGE_sequences/KY555145.gb', 'gb')
+
+print('Description:', my_mge.original.description)
+print('ID:', my_mge.original.id)
+
+
+my_mge.set_pseudogenomes(100, kmer_len=4)
+
+my_mge.original.scan(ctra_motif, 0.5, 8.25)
+my_mge.original.analyze_scores()
+my_mge.original.analyze_positional_distribution(50)
+my_mge.original.analyze_intergenicity()
+
+
+start = time.time()
+for g in my_mge.pseudogenomes:
+    g.scan(ctra_motif, 0.5, 8.25)
+    g.analyze_scores()
+    g.analyze_positional_distribution(50)
+    g.analyze_intergenicity()
+end = time.time()
+print(end - start)
+
+
+my_mge.set_pvalue('intergenicity', 'greater')
+my_mge.intergenicity
 
 
 
