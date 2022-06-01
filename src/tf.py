@@ -171,7 +171,7 @@ class TF():
         perm_motif.name = self.original.name + "_" + str(self.perm_counter)
         return perm_motif
     
-    def get_instances_array(self, list_of_strings):
+    def get_instances_array(self):
         ''' Returns instances as a 2D array of characters. '''
         list_of_strings = self.original.instances
         list_2D = []
