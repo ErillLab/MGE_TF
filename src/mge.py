@@ -42,13 +42,20 @@ class MGE():
             self.pseudogenomes.append(pseudogenome)
     
     def get_pseudogenome(self, kmer_len):
+        '''
+        It generates a 'pseudogenome'. For each genomic unit in the original
+        genome sequence, a k-sampled sequence is generated. The pseudogenome is
+        composed of these pseudo-units (k-sampled sequences) joined in the same
+        order as their corresponding units appear on the original genome, to
+        preserve genomic structure. In other words, each genomic unit is
+        independently 'k-sampled' (using the 'get_k_sampled_sequence' method).
+        '''
         pseudogenome = copy.deepcopy(self.original)
         self.clear_stats(pseudogenome)
         pseudogenome.seq = Seq("")
         units_bounds = pseudogenome.genomic_units['bounds']
         for i in range(len(units_bounds)-1):
             unit = self.original.seq[units_bounds[i]: units_bounds[i+1]]
-            print(unit[:5])  # !!!
             pseudogenome.seq += self.get_k_sampled_sequence(unit, kmer_len)
         
         # The permuted genome is assigned a unique ID
@@ -96,6 +103,7 @@ class MGE():
         return [str(seq)[i:i+k] for i in range(len(seq)-k+1)]
     
     def clear_stats(self, genome):
+        ''' Ensures all the statistics in the 'stats' list are set to None. '''
         stats = ['n_sites', 'site_density', 'avg_score', 'extremeness',
                  'counts', 'entropy', 'norm_entropy', 'gini', 'norm_gini',
                  'evenness', 'new_evenness', 'intergenicity']
@@ -112,6 +120,7 @@ class MGE():
             pg.scan(motif, pseudocount, threshold=None)
     
     def analyze_scores(self):
+        ''' Sets the p-value for the statistics related to the PSSM-scores. '''
         genomes = [self.original] + self.pseudogenomes
         for g in genomes:
             g.analyze_scores()
@@ -120,6 +129,8 @@ class MGE():
         self.set_pvalue('extremeness', 'greater')
     
     def analyze_positional_distribution(self):
+        ''' Sets the p-value for the statistics related to the positional
+        distribution. '''
         genomes = [self.original] + self.pseudogenomes
         for g in genomes:
             g.analyze_positional_distribution()
@@ -132,6 +143,7 @@ class MGE():
         self.set_pvalue('new_evenness', 'smaller')
     
     def analyze_intergenicity(self):
+        ''' Sets the p-value for the statistics related to the intergenicity. '''
         genomes = [self.original] + self.pseudogenomes
         for g in genomes:
             g.analyze_intergenicity()
@@ -144,7 +156,6 @@ class MGE():
         hypothesis. The estimate is based on the frequency of pseudogenomes
         that can reproduce the results observed on the original genome.
         '''
-        
         control_values = []
         for genome in self.pseudogenomes:
             control_values.append(vars(genome)[metric])
