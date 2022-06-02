@@ -52,7 +52,7 @@ class MGE_TF():
     def init_motif_specific_vals(self, stats):
         ''' Initialize motif_specific_vals attribute as a dictionary where the
         values are empty lists. '''
-        self.motif_specific_vals = dict(zip(stats, [[]]*len(stats)))
+        self.motif_specific_vals = dict(zip(stats, [[] for x in range(len(stats))]))
     
     def compile_motif_specific_vals(self, stats):
         ''' Compile motif_specific_vals attribute. The current statistic values
