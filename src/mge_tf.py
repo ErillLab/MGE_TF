@@ -63,26 +63,28 @@ class MGE_TF():
             self.motif_specific_vals[stat].append(val)
     
     def analyze_scores(self):
-        ''' Sets the p-value for the statistics related to the PSSM-scores. '''
-        # Set p-values
-        self.set_pvalue('avg_score', 'greater')
-        self.set_pvalue('extremeness', 'greater')
+        ''' Sets the p-value for the statistics related to the PSSM-scores.
+        The alternative Hp is always 'smaller' because the values used for this
+        test are already p-values. '''
+        self.set_pvalue('avg_score', 'smaller')
+        self.set_pvalue('extremeness', 'smaller')
     
     def analyze_positional_distribution(self):
-        ''' Sets the p-value for the statistics related to the positional
-        distribution. '''
-        # Set p-values
+        ''' Sets the p-value for the statistics related to the positional distribution.
+        The alternative Hp is always 'smaller' because the values used for this
+        test are already p-values. '''
         self.set_pvalue('entropy', 'smaller')
         self.set_pvalue('norm_entropy', 'smaller')
-        self.set_pvalue('gini', 'greater')
-        self.set_pvalue('norm_gini', 'greater')
-        self.set_pvalue('evenness', 'greater')
+        self.set_pvalue('gini', 'smaller')
+        self.set_pvalue('norm_gini', 'smaller')
+        self.set_pvalue('evenness', 'smaller')
         self.set_pvalue('new_evenness', 'smaller')
     
     def analyze_intergenicity(self):
-        ''' Sets the p-value for the statistics related to the intergenicity. '''
-        # Set p-values
-        self.set_pvalue('intergenicity', 'greater')
+        ''' Sets the p-value for the statistics related to the intergenicity.
+        The alternative Hp is always 'smaller' because the values used for this
+        test are already p-values. '''
+        self.set_pvalue('intergenicity', 'smaller')
     
     def set_pvalue(self, metric, alternative):
         '''
