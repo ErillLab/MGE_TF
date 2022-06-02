@@ -21,7 +21,7 @@ class TF():
         self.perm_counter = 0
         self.patser_threshold = None
         self.n_fake_instances = 100  # !!! Set from config
-        self.pseudocount_value = 0.5  # !!! Set from config
+        self.pseudocount = 0.5  # !!! Set from config
         self.set_threshold()
     
     
@@ -157,7 +157,7 @@ class TF():
         threshold_patser (used here) mimcs that.
         '''
         
-        pwm = self.original.counts.normalize(pseudocounts=self.pseudocount_value)
+        pwm = self.original.counts.normalize(pseudocounts=self.pseudocount)
         pssm = pwm.log_odds()
         distribution = pssm.distribution(precision=10**4)
         threshold = distribution.threshold_patser()
