@@ -19,6 +19,7 @@ class MGE():
         self.pseudogenomes = []
         self.source = (filepath, fileformat)
         self.pseudo_g_counter = 0
+        self.n_bins = 50  # !!! Set from config
         
         # p-values
         self.n_sites = None
@@ -128,12 +129,12 @@ class MGE():
         self.set_pvalue('avg_score', 'greater')
         self.set_pvalue('extremeness', 'greater')
     
-    def analyze_positional_distribution(self, n_bins):
+    def analyze_positional_distribution(self):
         ''' Sets the p-value for the statistics related to the positional
         distribution. '''
         genomes = [self.original] + self.pseudogenomes
         for g in genomes:
-            g.analyze_positional_distribution(n_bins)
+            g.analyze_positional_distribution(self.n_bins)
         # Set p-values
         self.set_pvalue('entropy', 'smaller')
         self.set_pvalue('norm_entropy', 'smaller')
