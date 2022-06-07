@@ -115,6 +115,7 @@ class Genome():
             self.hits['positions'] = hits_positions
             self.hits['threshold'] = threshold
             self.hits['motif_length'] = pssm.length
+            self.n_sites = len(hits_scores)
         
     def combine_f_and_r_scores(self, f_scores, r_scores):
         '''
@@ -239,7 +240,7 @@ class Genome():
         # Compute Gini coefficient
         nuber_of_bins = len(counts)
         number_of_obs = np.array(counts).sum()
-        Gini = self.get_gini_coeff(counts)
+        gini = self.get_gini_coeff(counts)
         
         # Compute minimum possible Gini coefficient
         quotient = number_of_obs // nuber_of_bins
@@ -247,20 +248,20 @@ class Genome():
         chunk_1 = np.repeat(quotient, nuber_of_bins - remainder)
         chunk_2 = np.repeat(quotient + 1, remainder)
         vect = np.hstack((chunk_1, chunk_2))  # values distr as evenly as possible
-        min_Gini = self.get_gini_coeff(vect)
+        min_gini = self.get_gini_coeff(vect)
         
         # Compute maximum possible Gini coefficient
         chunk_1 = np.repeat(0, nuber_of_bins - 1)
         chunk_2 = np.repeat(number_of_obs, 1)
         vect = np.hstack((chunk_1, chunk_2))  # values distr as unevenly as possible
         vect = [int(v) for v in vect]
-        max_Gini = self.get_gini_coeff(vect)
+        max_gini = self.get_gini_coeff(vect)
         
         # Compute normalized Gini coefficient
-        if max_Gini - min_Gini == 0:
+        if max_gini - min_gini == 0:
             norm_gini = 0
         else:
-            norm_gini = (Gini - min_Gini) / (max_Gini - min_Gini)
+            norm_gini = (gini - min_gini) / (max_gini - min_gini)
         
         return norm_gini
     
@@ -284,8 +285,6 @@ class Genome():
         It's the variance of the distances between consecutive (sorted)
         datapoints.
         '''
-        if len(self.hits['positions']) < 2:
-            return 'Not enough sites'
         
         intervals = self.get_hits_distances()
         return np.var(intervals)
@@ -295,8 +294,6 @@ class Genome():
         Normalized evenness.
         Norm_Evenness = Evenness / Max_Evenness
         '''
-        if len(self.hits['positions']) < 2:
-            return 'Not enough sites'
         
         intervals = self.get_hits_distances()
         var = np.var(intervals)
@@ -313,8 +310,6 @@ class Genome():
         even distribution (it's the opposite in the original definition of
         evenness by Philip and Freeland).
         '''
-        if len(self.hits['positions']) < 2:
-            return 'Not enough sites'
         
         norm_var = self.get_norm_evenness()
         new_evenness = 1 - norm_var
@@ -327,11 +322,13 @@ class Genome():
                 "The 'hits' attribute is 'NoneType'. Make sure you call the\
                 'scan' method specifying a threshold to get PSSM-hits before\
                 calling 'analyze_positional_distribution'.")
-                
-        # Set average score
-        self.avg_score = self.hits['scores'].mean()
-        # Set extrmeness
-        self.extremeness = (self.hits['scores'] - self.hits['threshold']).sum()
+        
+        if self.n_sites == 0:
+            self.avg_score = 'no_sites'
+            self.extremeness = 0
+        else:
+            self.avg_score = self.hits['scores'].mean()
+            self.extremeness = (self.hits['scores'] - self.hits['threshold']).sum()
     
     def set_counts(self, n_bins, use_double_binning):
         
@@ -366,43 +363,50 @@ class Genome():
                 'scan' method specifying a threshold to get PSSM-hits before\
                 calling 'analyze_positional_distribution'.")
         
-        # Number of predicted binding sites
-        self.n_sites = len(self.hits['scores'])
         # Site density (sites per thousand bp)
         self.site_density = 1000 * self.n_sites / self.length
         
-        # Set counts (regular binning and shifted binning)
-        self.set_counts(n_bins, use_double_binning)
-        counts_regular, counts_shifted = self.counts.values()
+        if self.n_sites < 3:  # !!! Make it a parameter (from config file?)
+            self.entropy = 'not_enough_sites'
+            self.norm_entropy = 'not_enough_sites'
+            self.gini = 'not_enough_sites'
+            self.norm_gini = 'not_enough_sites'
+            self.evenness = 'not_enough_sites'
+            self.new_evenness = 'not_enough_sites'
         
-        # Entropy, Normalized entropy, Gini, Normalized Gini (regular frame)
-        entr = self.get_entropy(counts_regular)
-        norm_entr = self.get_norm_entropy(counts_regular)
-        gini = self.get_gini_coeff(counts_regular)
-        norm_gini = self.get_norm_gini_coeff(counts_regular)
-        
-        if use_double_binning:
-            # Entropy, Normalized entropy, Gini, Normalized Gini (shifted frame)
-            entr_sh = self.get_entropy(counts_shifted)
-            norm_entr_sh = self.get_norm_entropy(counts_shifted)
-            gini_sh = self.get_gini_coeff(counts_shifted)
-            norm_gini_sh = self.get_norm_gini_coeff(counts_shifted)
+        else:
+            # Set counts (regular binning and shifted binning)
+            self.set_counts(n_bins, use_double_binning)
+            counts_regular, counts_shifted = self.counts.values()
             
-            # Chose frame that detects clusters the most
-            entr = min(entr, entr_sh)
-            norm_entr = min(norm_entr, norm_entr_sh)
-            gini = max(gini, gini_sh)
-            norm_gini = max(norm_gini, norm_gini_sh)
-        
-        # Set entropy, normalized entropy, Gini and normalized Gini
-        self.entropy = entr
-        self.norm_entropy = norm_entr
-        self.gini = gini
-        self.norm_gini = norm_gini
-        
-        # Set original evenness and new evenness
-        self.evenness = self.get_original_evenness()
-        self.new_evenness = self.get_new_evenness()
+            # Entropy, Normalized entropy, Gini, Normalized Gini (regular frame)
+            entr = self.get_entropy(counts_regular)
+            norm_entr = self.get_norm_entropy(counts_regular)
+            gini = self.get_gini_coeff(counts_regular)
+            norm_gini = self.get_norm_gini_coeff(counts_regular)
+            
+            if use_double_binning:
+                # Entropy, Normalized entropy, Gini, Normalized Gini (shifted frame)
+                entr_sh = self.get_entropy(counts_shifted)
+                norm_entr_sh = self.get_norm_entropy(counts_shifted)
+                gini_sh = self.get_gini_coeff(counts_shifted)
+                norm_gini_sh = self.get_norm_gini_coeff(counts_shifted)
+                
+                # Chose frame that detects clusters the most
+                entr = min(entr, entr_sh)
+                norm_entr = min(norm_entr, norm_entr_sh)
+                gini = max(gini, gini_sh)
+                norm_gini = max(norm_gini, norm_gini_sh)
+            
+            # Set entropy, normalized entropy, Gini and normalized Gini
+            self.entropy = entr
+            self.norm_entropy = norm_entr
+            self.gini = gini
+            self.norm_gini = norm_gini
+            
+            # Set original evenness and new evenness
+            self.evenness = self.get_original_evenness()
+            self.new_evenness = self.get_new_evenness()
     
     def overlaps_with_feature(self, site_pos, feat):
         '''
@@ -447,7 +451,6 @@ class Genome():
                 In a circular genome of 1,000,000 bp a TFBS located at position
                 1000 would be reported to be at +1030 bp from a gene start located
                 at position 999,970.
-            
         '''
         
         # Define site center "position" (it can be non-integer)
@@ -576,17 +579,18 @@ class Genome():
         self.set_hits_intergenic()
         
         if self.n_sites == 0:
-            return 'no_hits'
-        
-        if self.hits['intergenic'] == 'no_genes':
-            return 'no_genes'
-        
-        # Count number of intergenic sites
-        n_intergenic = sum(self.hits['intergenic'])
-        # Intergenic frequency
-        intergenic_freq = n_intergenic / self.n_sites
-        # Set intergenicity attribute
-        self.intergenicity = intergenic_freq
+            self.intergenicity = 'no_sites'
+            
+        elif self.hits['intergenic'] == 'no_genes':
+            self.intergenicity = 'no_genes'
+            
+        else:
+            # Count number of intergenic sites
+            n_intergenic = sum(self.hits['intergenic'])
+            # Intergenic frequency
+            intergenic_freq = n_intergenic / self.n_sites
+            # Set intergenicity attribute
+            self.intergenicity = intergenic_freq
     
     
     

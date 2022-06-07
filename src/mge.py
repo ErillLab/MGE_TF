@@ -9,6 +9,7 @@ import random
 import copy
 from Bio.Seq import Seq
 from genome import Genome
+import warnings
 
 
 class MGE():
@@ -164,19 +165,30 @@ class MGE():
         if None in control_values:
             raise ValueError('The value of ' + str(metric) +
                              ' is not set for all pseudogenomes.')
-        control = np.array(control_values)
+        
+        valid_values = [x for x in control_values if not isinstance(x, str)]
+        if len(valid_values) < len(control_values):
+            warnings.warn("Only {}/{} values of {} were valid and used to \
+                          estimate the p-value.".format(len(valid_values),
+                          len(control_values), metric))
+        
+        control = np.array(valid_values)
         obs = vars(self.original)[metric]
         
-        if alternative == 'greater':
-            p_val = (control >= obs).sum()/len(control)
-        elif alternative == 'smaller':
-            p_val = (control <= obs).sum()/len(control)
+        if obs == None:
+            p_val = 'no_obs'
+        
         else:
-            raise ValueError('alternative should be "greater" or "smaller".')
+            if alternative == 'greater':
+                p_val = (control >= obs).sum()/len(control)
+            elif alternative == 'smaller':
+                p_val = (control <= obs).sum()/len(control)
+            else:
+                raise ValueError('alternative should be "greater" or "smaller".')
+        
         # Set p_value
         vars(self)[metric] = p_val
 
-    
 
 
 

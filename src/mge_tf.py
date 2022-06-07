@@ -6,6 +6,7 @@
 """
 
 import numpy as np
+import warnings
 
 
 class MGE_TF():
@@ -93,14 +94,27 @@ class MGE_TF():
         that can reproduce the results observed on the original genome.
         '''
         obs = self.motif_specific_vals[metric][0]
-        control = np.array(self.motif_specific_vals[metric][1:])
+        control_values = self.motif_specific_vals[metric][1:]
         
-        if alternative == 'greater':
-            p_val = (control >= obs).sum()/len(control)
-        elif alternative == 'smaller':
-            p_val = (control <= obs).sum()/len(control)
+        valid_values = [x for x in control_values if not isinstance(x, str)]
+        if len(valid_values) < len(control_values):
+            warnings.warn("Only {}/{} values of {} were valid and used to \
+                          estimate the p-value.".format(len(valid_values),
+                          len(control_values), metric))
+        
+        control = np.array(valid_values)
+        
+        if obs == None:
+            p_val = 'no_valid_obs'
+        
         else:
-            raise ValueError('alternative should be "greater" or "smaller".')
+            if alternative == 'greater':
+                p_val = (control >= obs).sum()/len(control)
+            elif alternative == 'smaller':
+                p_val = (control <= obs).sum()/len(control)
+            else:
+                raise ValueError('alternative should be "greater" or "smaller".')
+        
         # Set p_value
         vars(self)[metric] = p_val
     
