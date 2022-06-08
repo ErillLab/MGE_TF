@@ -107,6 +107,9 @@ class MGE_TF():
         if not isinstance(obs, (int, float)):
             p_val = 'no_valid_obs'
         
+        elif len(control) == 0:
+            p_val = 'no_control_vals'
+        
         else:
             if alternative == 'greater':
                 p_val = (control >= obs).sum()/len(control)
