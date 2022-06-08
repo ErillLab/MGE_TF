@@ -23,7 +23,6 @@ class MGE():
         self.n_bins = 50  # !!! Set from config
         
         # p-values
-        self.n_sites = None
         self.site_density = None
         self.avg_score = None
         self.extremeness = None
@@ -168,14 +167,14 @@ class MGE():
         
         valid_values = [x for x in control_values if not isinstance(x, str)]
         if len(valid_values) < len(control_values):
-            warnings.warn("Only {}/{} values of {} were valid and used to \
-                          estimate the p-value.".format(len(valid_values),
+            warnings.warn(("Only {}/{} values of {} were valid and used to "
+                           "estimate the p-value.").format(len(valid_values),
                           len(control_values), metric))
         
         control = np.array(valid_values)
         obs = vars(self.original)[metric]
         
-        if obs == None:
+        if not isinstance(obs, (int, float)):
             p_val = 'no_obs'
         
         else:

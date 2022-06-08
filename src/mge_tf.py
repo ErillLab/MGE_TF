@@ -104,7 +104,7 @@ class MGE_TF():
         
         control = np.array(valid_values)
         
-        if obs == None:
+        if not isinstance(obs, (int, float)):
             p_val = 'no_valid_obs'
         
         else:
