@@ -104,7 +104,7 @@ class MGE_TF():
         
         control = np.array(valid_values)
         
-        if not isinstance(obs, (int, float)):
+        if isinstance(obs, (str, type(None))):
             p_val = 'no_valid_obs'
         
         elif len(control) == 0:

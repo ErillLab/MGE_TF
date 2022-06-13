@@ -174,7 +174,7 @@ class MGE():
         control = np.array(valid_values)
         obs = vars(self.original)[metric]
         
-        if not isinstance(obs, (int, float)):
+        if isinstance(obs, (str, type(None))):
             p_val = 'no_obs'
         
         elif len(control)==0:
