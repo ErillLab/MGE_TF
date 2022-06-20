@@ -6,6 +6,9 @@
 """
 
 import numpy as np
+import pandas as pd
+import json
+import os
 import warnings
 
 
@@ -120,6 +123,38 @@ class MGE_TF():
         
         # Set p_value
         vars(self)[metric] = p_val
+    
+    def save_p_vals(self, outdir=None):
+        
+        # Save p-values to CSV file
+        stats = ['avg_score', 'extremeness', 'entropy', 'norm_entropy', 'gini',
+                  'norm_gini', 'evenness', 'new_evenness', 'intergenicity']
+        first_pval = []
+        second_pval = []
+        for stat in stats:
+            first_pval.append(self.motif_specific_vals[stat][0])
+            second_pval.append(vars(self)[stat])
+
+        res = pd.DataFrame({'stat_name': stats,
+                            'pval': first_pval,
+                            'corrected_pval': second_pval})
+        filename = self.tf.original.name + "_" + self.mge.original.id + '.csv'
+        if outdir != None:
+            if not os.path.exists(outdir):
+                os.mkdir(outdir)
+            filename = outdir + "/" + filename
+        res.to_csv(filename, index=False)
+    
+    def save_motif_specific_vals(self, outdir=None):
+        
+        # Save motif-specific results to JSON file
+        filename = self.tf.original.name + "_" + self.mge.original.id + '_motif_specific_values.json'
+        if outdir != None:
+            if not os.path.exists(outdir):
+                os.mkdir(outdir)
+            filename = outdir + "/" + filename
+        with open(filename, 'w') as f:
+            json.dump(self.motif_specific_vals, f)
     
     
     

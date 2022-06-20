@@ -1,0 +1,8 @@
+{
+	"n_pseudogenomes": 100,
+	"kmer_len": 6,
+	"n_permuted_motifs": 100,
+	"mge_dirname": "MGE_sequences",
+	"tf_dirname": "TF_binding_motifs",
+	"out_dirname": "../test_outdir"
+}
