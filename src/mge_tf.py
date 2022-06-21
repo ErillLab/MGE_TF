@@ -31,20 +31,24 @@ class MGE_TF():
         self.new_evenness = None
         self.intergenicity = None
     
-    def compute_motif_specific_vals(self):
+    def compute_motif_specific_vals(self, save_original_data=True, outdir=None):
         '''
         Each motif in the TF object (the original motif and the permuted motifs)
         is used to analyze the MGE object. The results for each motif are
         stored in the motif_specific_vals attribute.
         motif_specific_vals is a dictionary where the keys are the different
         metrics, and the values are lists with the results from all the motifs.
+        
+        
+        !!! save_original_data:
+        
+            
         '''
         
         stats = ['avg_score', 'extremeness', 'entropy', 'norm_entropy', 'gini',
                  'norm_gini', 'evenness', 'new_evenness', 'intergenicity']
         
         self.init_motif_specific_vals(stats)
-        
         all_motifs = [self.tf.original] + self.tf.permuted
         for m in all_motifs:
             self.mge.scan(m, self.tf.pseudocount, self.tf.patser_threshold)
@@ -52,6 +56,10 @@ class MGE_TF():
             self.mge.analyze_positional_distribution()
             self.mge.analyze_intergenicity()
             self.compile_motif_specific_vals(stats)
+            if save_original_data:
+                filename_tag = m.name + '_' + self.mge.original.id
+                self.mge.original.save_report(filename_tag, outdir)
+                save_original_data = False
     
     def init_motif_specific_vals(self, stats):
         ''' Initialize motif_specific_vals attribute as a dictionary where the
@@ -125,6 +133,9 @@ class MGE_TF():
         vars(self)[metric] = p_val
     
     def save_p_vals(self, outdir=None):
+        '''
+        !!! Docstring here
+        '''
         
         # Save p-values to CSV file
         stats = ['avg_score', 'extremeness', 'entropy', 'norm_entropy', 'gini',
@@ -146,6 +157,9 @@ class MGE_TF():
         res.to_csv(filename, index=False)
     
     def save_motif_specific_vals(self, outdir=None):
+        '''
+        !!! Docstring here
+        '''
         
         # Save motif-specific results to JSON file
         filename = self.tf.original.name + "_" + self.mge.original.id + '_motif_specific_values.json'

@@ -6,6 +6,10 @@
 
 import numpy as np
 from Bio import SeqIO
+import pandas as pd
+import json
+import copy
+import os
 
 
 class Genome():
@@ -90,6 +94,7 @@ class Genome():
             unit_idx_start = units_bounds.index(start)
             unit_idx_end = units_bounds.index(end)
             coding_units[unit_idx_start:unit_idx_end] = True
+        coding_units = list(coding_units)
         
         self.genomic_units['bounds'] = units_bounds
         self.genomic_units['coding'] = coding_units
@@ -592,8 +597,53 @@ class Genome():
             # Set intergenicity attribute
             self.intergenicity = intergenic_freq
     
+    def save_report(self, filename_tag, outdir=None):
+        '''
+        !!! Docstring here
+        '''
+        
+        if outdir != None:
+            if not os.path.exists(outdir):
+                os.mkdir(outdir)
+        
+        # Save hits (CSV)
+        hits_table = pd.DataFrame(self.hits)
+        filename = filename_tag + '_hits_table.csv'
+        if outdir != None:
+            filename = outdir + "/" + filename
+        hits_table.to_csv(filename)
+        
+        # Save stats (JSON)
+        stats = ['n_sites', 'site_density', 'avg_score', 'extremeness',
+                 'entropy', 'norm_entropy', 'gini', 'norm_gini', 'evenness',
+                 'new_evenness', 'intergenicity', 'length', 'genomic_units']
+        stats_report = copy.deepcopy({k:vars(self)[k] for k in stats})
+        for k in stats_report.keys():
+            if isinstance(stats_report[k], np.float32):
+                stats_report[k] = stats_report[k].item()
+        str_list = [str(b) for b in stats_report['genomic_units']['coding']]
+        stats_report['genomic_units']['coding'] = str_list
+        filename = filename_tag + '_stats_report.json'
+        if outdir != None:
+            filename = outdir + "/" + filename
+        with open(filename, 'w') as f:
+            json.dump(stats_report, f)
+        
+        # Save PSSM scores (JSON)
+        d = {k : list(v.astype(np.float64)) for k, v in self.pssm_scores.items()}
+        filename = filename_tag + '_pssm_scores.json'
+        if outdir != None:
+            filename = outdir + "/" + filename
+        with open(filename, 'w') as f:
+            json.dump(d, f)
     
     
+
+
+
+
+
+
 
 
 
