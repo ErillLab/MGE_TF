@@ -29,6 +29,7 @@ class MGE_TF():
         self.norm_gini = None
         self.evenness = None
         self.new_evenness = None
+        self.ripleyl = None
         self.intergenicity = None
     
     def compute_motif_specific_vals(self, save_original_data=True, outdir=None):
@@ -46,7 +47,7 @@ class MGE_TF():
         '''
         
         stats = ['avg_score', 'extremeness', 'entropy', 'norm_entropy', 'gini',
-                 'norm_gini', 'evenness', 'new_evenness', 'intergenicity']
+                 'norm_gini', 'evenness', 'new_evenness', 'ripleyl', 'intergenicity']
         
         self.init_motif_specific_vals(stats)
         all_motifs = [self.tf.original] + self.tf.permuted
@@ -91,6 +92,7 @@ class MGE_TF():
         self.set_pvalue('norm_gini', 'smaller')
         self.set_pvalue('evenness', 'smaller')
         self.set_pvalue('new_evenness', 'smaller')
+        self.set_pvalue('ripleyl', 'greater')
     
     def analyze_intergenicity(self):
         ''' Sets the p-value for the statistics related to the intergenicity.

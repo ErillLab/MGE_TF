@@ -21,6 +21,7 @@ class MGE():
         self.source = (filepath, fileformat)
         self.pseudo_g_counter = 0
         self.n_bins = 50  # !!! Set from config
+        self.ripley_d = 300  # !!! Set from config
         
         # p-values
         self.site_density = None
@@ -32,6 +33,7 @@ class MGE():
         self.norm_gini = None
         self.evenness = None
         self.new_evenness = None
+        self.ripleyl = None
         self.intergenicity = None
     
     def set_pseudogenomes(self, n_pseudogenomes, kmer_len):
@@ -107,7 +109,7 @@ class MGE():
         ''' Ensures all the statistics in the 'stats' list are set to None. '''
         stats = ['n_sites', 'site_density', 'avg_score', 'extremeness',
                  'counts', 'entropy', 'norm_entropy', 'gini', 'norm_gini',
-                 'evenness', 'new_evenness', 'intergenicity']
+                 'evenness', 'new_evenness', 'ripleyl', 'intergenicity']
         for stat in stats:
             vars(genome)[stat] = None
     
@@ -134,7 +136,7 @@ class MGE():
         distribution. '''
         genomes = [self.original] + self.pseudogenomes
         for g in genomes:
-            g.analyze_positional_distribution(self.n_bins)
+            g.analyze_positional_distribution(self.n_bins, self.ripley_d)
         # Set p-values
         self.set_pvalue('entropy', 'smaller')
         self.set_pvalue('norm_entropy', 'smaller')
@@ -142,6 +144,7 @@ class MGE():
         self.set_pvalue('norm_gini', 'greater')
         self.set_pvalue('evenness', 'greater')
         self.set_pvalue('new_evenness', 'smaller')
+        self.set_pvalue('ripleyl', 'greater')  # !!! Give the user more control over the hypothsis to be tested? greater/smaller from config?
     
     def analyze_intergenicity(self):
         ''' Sets the p-value for the statistics related to the intergenicity. '''

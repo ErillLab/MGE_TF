@@ -52,6 +52,7 @@ class Genome():
         self.norm_gini = None
         self.evenness = None
         self.new_evenness = None
+        self.ripleyl = None
         self.intergenicity = None
         
         # Features considered as 'coding' => When a site falls within one of
@@ -320,6 +321,60 @@ class Genome():
         new_evenness = 1 - norm_var
         return new_evenness
     
+    def get_ecdf(self, values):
+        ''' Returns the empyrical cumulative distribution function for the
+        values vector. '''
+        x, counts = np.unique(values, return_counts=True)
+        cusum = np.cumsum(counts)
+        y = cusum / cusum[-1]
+        return x, y
+    
+    def get_ripleyk_function(self):
+        ''' Returns the Ripley's K function as a pair of vectors:
+        the x values (distances) and their associated k values (cumulative
+        frequencies). '''
+        pos = self.hits['positions']
+        # Get all unique pairwise distances (self-distances are not considered)
+        distances = []
+        for i in range(len(pos)):
+            for j in range(i+1, len(pos)):
+                distances.append(abs(pos[j] - pos[i]))
+        distances.sort()
+        # return estimated cumulative distribution of distances
+        x, k = self.get_ecdf(distances)
+        return x, k
+    
+    def get_expected_k(self, d):
+        '''
+        Returns the expected k value (from the 1D Ripley's K function) given a
+        random (uniform) distribution of positions over the genome.
+        '''
+        d = int(d)
+        n_dist_above_d = (self.length - d) * (self.length - d + 1)
+        tot_n_dist = self.length * (self.length + 1)
+        # Number of distance values smaller than or equal to d
+        n_dist_up_to_d = tot_n_dist - n_dist_above_d
+        # Frequency of distance values smaller than or equal to d
+        return n_dist_up_to_d / tot_n_dist
+    
+    def get_ripleyl(self, d):
+        '''
+        Applies the Ripley's L function and returns the l value for a given
+        distance d. The Ripley's L function is applied to the observed position
+        of hits along the genome (it uses the 1D version of Ripley's function).
+        The l value is the difference between the observed k value (from the
+        Ripley's K function) and the expected k value.
+        '''
+        # Ripley's K function
+        x, k = self.get_ripleyk_function()
+        # Observed k value for distance d
+        idx = x.searchsorted(d, 'right') - 1
+        obs_k = k[idx]
+        # Expected k value for distance d
+        exp_k = self.get_expected_k(d)
+        # l value
+        return obs_k - exp_k        
+    
     def analyze_scores(self):
         
         if not self.hits:
@@ -360,7 +415,7 @@ class Genome():
         self.counts = {'regular_binning': counts,
                        'shifted_binning': counts_shifted}
     
-    def analyze_positional_distribution(self, n_bins, use_double_binning=True):
+    def analyze_positional_distribution(self, n_bins, ripley_d, use_double_binning=True):
         
         if not self.hits:
             raise TypeError(
@@ -378,6 +433,7 @@ class Genome():
             self.norm_gini = 'not_enough_sites'
             self.evenness = 'not_enough_sites'
             self.new_evenness = 'not_enough_sites'
+            self.ripleyl = 'not_enough_sites'
         
         else:
             # Set counts (regular binning and shifted binning)
@@ -412,6 +468,9 @@ class Genome():
             # Set original evenness and new evenness
             self.evenness = self.get_original_evenness()
             self.new_evenness = self.get_new_evenness()
+            
+            # Set Ripley's l value
+            self.ripleyl = self.get_ripleyl(ripley_d)
     
     def overlaps_with_feature(self, site_pos, feat):
         '''
