@@ -32,7 +32,7 @@ def go():
             my_mge_tf = MGE_TF(my_mge, my_tf)
             
             # Compute values
-            my_mge_tf.compute_motif_specific_vals()
+            my_mge_tf.compute_motif_specific_vals(outdir=OUT_DIRNAME)
             # Analyze hits
             my_mge_tf.analyze_scores()
             my_mge_tf.analyze_positional_distribution()
