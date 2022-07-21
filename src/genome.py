@@ -19,6 +19,7 @@ class Genome():
         SR = SeqIO.read(filepath, fileformat)
         # For traceability
         self.source = (filepath, fileformat)
+        self.type = 'original'
         
         # SeqRecord
         self.seq = SR.seq
@@ -100,7 +101,7 @@ class Genome():
         self.genomic_units['bounds'] = units_bounds
         self.genomic_units['coding'] = coding_units
     
-    def scan(self, motif, pseudocount, threshold=None):
+    def scan(self, motif, pseudocount, threshold=None, top_n=None):
         pwm = motif.counts.normalize(pseudocounts=pseudocount)
         rpwm = pwm.reverse_complement()
         # Generate PSSM (and reverse complement)
@@ -122,7 +123,7 @@ class Genome():
             self.hits['threshold'] = threshold
             self.hits['motif_length'] = pssm.length
             self.n_sites = len(hits_scores)
-        
+    
     def combine_f_and_r_scores(self, f_scores, r_scores):
         '''
         Combines the PSSM scores on the forward and reverse strand into
@@ -271,37 +272,36 @@ class Genome():
         
         return norm_gini
     
-    def get_hits_distances(self):
+    def get_hits_distances(self, positions):
         '''
         Returns the distance (in bp) between consecutive hits on the genome.
         '''
         distances = []
-        hits_positions = self.hits['positions']
-        for i in range(len(hits_positions)):
+        for i in range(len(positions)):
             if i == 0:
-                distance = self.length - hits_positions[-1] + hits_positions[i]
+                distance = self.length - positions[-1] + positions[i]
             else:
-                distance = hits_positions[i] - hits_positions[i-1]
+                distance = positions[i] - positions[i-1]
             distances.append(distance)
         return distances
 
-    def get_original_evenness(self):
+    def get_original_evenness(self, positions):
         '''
         Evenness as defined in Philip and Freeland (2011).
         It's the variance of the distances between consecutive (sorted)
         datapoints.
         '''
         
-        intervals = self.get_hits_distances()
+        intervals = self.get_hits_distances(positions)
         return np.var(intervals)
 
-    def get_norm_evenness(self):
+    def get_norm_evenness(self, positions):
         '''
         Normalized evenness.
         Norm_Evenness = Evenness / Max_Evenness
         '''
         
-        intervals = self.get_hits_distances()
+        intervals = self.get_hits_distances(positions)
         var = np.var(intervals)
         
         n_intervals = len(intervals)
@@ -310,14 +310,14 @@ class Genome():
         norm_var = var / max_var
         return norm_var
 
-    def get_new_evenness(self):
+    def get_new_evenness(self, positions):
         '''
         A transformation is applied so that large evenness values imply a very
         even distribution (it's the opposite in the original definition of
         evenness by Philip and Freeland).
         '''
         
-        norm_var = self.get_norm_evenness()
+        norm_var = self.get_norm_evenness(positions)
         new_evenness = 1 - norm_var
         return new_evenness
     
@@ -329,16 +329,15 @@ class Genome():
         y = cusum / cusum[-1]
         return x, y
     
-    def get_ripleyk_function(self):
+    def get_ripleyk_function(self, positions):
         ''' Returns the Ripley's K function as a pair of vectors:
         the x values (distances) and their associated k values (cumulative
         frequencies). '''
-        pos = self.hits['positions']
         # Get all unique pairwise distances (self-distances are not considered)
         distances = []
-        for i in range(len(pos)):
-            for j in range(i+1, len(pos)):
-                distances.append(abs(pos[j] - pos[i]))
+        for i in range(len(positions)):
+            for j in range(i+1, len(positions)):
+                distances.append(abs(positions[j] - positions[i]))
         distances.sort()
         # return estimated cumulative distribution of distances
         x, k = self.get_ecdf(distances)
@@ -357,7 +356,7 @@ class Genome():
         # Frequency of distance values smaller than or equal to d
         return n_dist_up_to_d / tot_n_dist
     
-    def get_ripleyl(self, d):
+    def get_ripleyl(self, positions, d):
         '''
         Applies the Ripley's L function and returns the l value for a given
         distance d. The Ripley's L function is applied to the observed position
@@ -366,7 +365,7 @@ class Genome():
         Ripley's K function) and the expected k value.
         '''
         # Ripley's K function
-        x, k = self.get_ripleyk_function()
+        x, k = self.get_ripleyk_function(positions)
         # Observed k value for distance d
         idx = x.searchsorted(d, 'right') - 1
         obs_k = k[idx]
@@ -390,11 +389,11 @@ class Genome():
             self.avg_score = self.hits['scores'].mean()
             self.extremeness = (self.hits['scores'] - self.hits['threshold']).sum()
     
-    def set_counts(self, n_bins, use_double_binning):
+    def set_counts(self, positions, n_bins, use_double_binning):
         
         # Counts in each bin (for Entropy and Gini)
         counts, bins = np.histogram(
-            self.hits['positions'], bins=n_bins, range=(0, self.length))
+            positions, bins=n_bins, range=(0, self.length))
         counts_shifted = None
         
         if use_double_binning:
@@ -402,7 +401,7 @@ class Genome():
             half_bin_size = int((bins[1] - bins[0])/2)
             # Change coordinates (start point moved from 0 to half_bin_size)
             shifted_matches_positions = []
-            for m_pos in self.hits['positions']:
+            for m_pos in positions:
                 shifted_m_pos = m_pos - half_bin_size
                 if shifted_m_pos < 0:
                     shifted_m_pos += self.length
@@ -415,7 +414,9 @@ class Genome():
         self.counts = {'regular_binning': counts,
                        'shifted_binning': counts_shifted}
     
-    def analyze_positional_distribution(self, n_bins, ripley_d, use_double_binning=True):
+    def analyze_positional_distribution(self, n_bins, ripley_d,
+                                        use_double_binning=True,
+                                        n_top_scores=None):
         
         if not self.hits:
             raise TypeError(
@@ -426,6 +427,25 @@ class Genome():
         # Site density (sites per thousand bp)
         self.site_density = 1000 * self.n_sites / self.length
         
+        # If the number of best scores to be considered for the positional
+        # distribution analysis was not specified, the hits (defined by the
+        # Patser threshold) are going to be used (therefore the number of best
+        # scores to be considered is the number of hits, i.e., self.n_sites).
+        if not n_top_scores:
+            if self.n_sites < 2:
+                n_top_scores = 2
+            else:
+                n_top_scores = self.n_sites
+        
+        if n_top_scores == self.n_sites:
+            positions = self.hits['positions']
+        else:            
+            positions = np.argpartition(
+                self.pssm_scores['combined'], -n_top_scores)[-n_top_scores:]
+        
+        
+        
+        '''
         if self.n_sites < 3:  # !!! Make it a parameter (from config file?)
             self.entropy = 'not_enough_sites'
             self.norm_entropy = 'not_enough_sites'
@@ -434,43 +454,44 @@ class Genome():
             self.evenness = 'not_enough_sites'
             self.new_evenness = 'not_enough_sites'
             self.ripleyl = 'not_enough_sites'
+        '''
         
-        else:
-            # Set counts (regular binning and shifted binning)
-            self.set_counts(n_bins, use_double_binning)
-            counts_regular, counts_shifted = self.counts.values()
+        
+        # Set counts (regular binning and shifted binning)
+        self.set_counts(positions, n_bins, use_double_binning)
+        counts_regular, counts_shifted = self.counts.values()
+        
+        # Entropy, Normalized entropy, Gini, Normalized Gini (regular frame)
+        entr = self.get_entropy(counts_regular)
+        norm_entr = self.get_norm_entropy(counts_regular)
+        gini = self.get_gini_coeff(counts_regular)
+        norm_gini = self.get_norm_gini_coeff(counts_regular)
+        
+        if use_double_binning:
+            # Entropy, Normalized entropy, Gini, Normalized Gini (shifted frame)
+            entr_sh = self.get_entropy(counts_shifted)
+            norm_entr_sh = self.get_norm_entropy(counts_shifted)
+            gini_sh = self.get_gini_coeff(counts_shifted)
+            norm_gini_sh = self.get_norm_gini_coeff(counts_shifted)
             
-            # Entropy, Normalized entropy, Gini, Normalized Gini (regular frame)
-            entr = self.get_entropy(counts_regular)
-            norm_entr = self.get_norm_entropy(counts_regular)
-            gini = self.get_gini_coeff(counts_regular)
-            norm_gini = self.get_norm_gini_coeff(counts_regular)
-            
-            if use_double_binning:
-                # Entropy, Normalized entropy, Gini, Normalized Gini (shifted frame)
-                entr_sh = self.get_entropy(counts_shifted)
-                norm_entr_sh = self.get_norm_entropy(counts_shifted)
-                gini_sh = self.get_gini_coeff(counts_shifted)
-                norm_gini_sh = self.get_norm_gini_coeff(counts_shifted)
-                
-                # Chose frame that detects clusters the most
-                entr = min(entr, entr_sh)
-                norm_entr = min(norm_entr, norm_entr_sh)
-                gini = max(gini, gini_sh)
-                norm_gini = max(norm_gini, norm_gini_sh)
-            
-            # Set entropy, normalized entropy, Gini and normalized Gini
-            self.entropy = entr
-            self.norm_entropy = norm_entr
-            self.gini = gini
-            self.norm_gini = norm_gini
-            
-            # Set original evenness and new evenness
-            self.evenness = self.get_original_evenness()
-            self.new_evenness = self.get_new_evenness()
-            
-            # Set Ripley's l value
-            self.ripleyl = self.get_ripleyl(ripley_d)
+            # Chose frame that detects clusters the most
+            entr = min(entr, entr_sh)
+            norm_entr = min(norm_entr, norm_entr_sh)
+            gini = max(gini, gini_sh)
+            norm_gini = max(norm_gini, norm_gini_sh)
+        
+        # Set entropy, normalized entropy, Gini and normalized Gini
+        self.entropy = entr
+        self.norm_entropy = norm_entr
+        self.gini = gini
+        self.norm_gini = norm_gini
+        
+        # Set original evenness and new evenness
+        self.evenness = self.get_original_evenness(positions)
+        self.new_evenness = self.get_new_evenness(positions)
+        
+        # Set Ripley's l value
+        self.ripleyl = self.get_ripleyl(positions, ripley_d)
     
     def overlaps_with_feature(self, site_pos, feat):
         '''

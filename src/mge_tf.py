@@ -141,7 +141,7 @@ class MGE_TF():
         
         # Save p-values to CSV file
         stats = ['avg_score', 'extremeness', 'entropy', 'norm_entropy', 'gini',
-                  'norm_gini', 'evenness', 'new_evenness', 'intergenicity']
+                  'norm_gini', 'evenness', 'new_evenness', 'ripleyl', 'intergenicity']
         first_pval = []
         second_pval = []
         for stat in stats:

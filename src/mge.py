@@ -55,6 +55,7 @@ class MGE():
         '''
         pseudogenome = copy.deepcopy(self.original)
         self.clear_stats(pseudogenome)
+        pseudogenome.type = 'pseudogenome'
         pseudogenome.seq = Seq("")
         units_bounds = pseudogenome.genomic_units['bounds']
         for i in range(len(units_bounds)-1):
@@ -134,9 +135,9 @@ class MGE():
     def analyze_positional_distribution(self):
         ''' Sets the p-value for the statistics related to the positional
         distribution. '''
-        genomes = [self.original] + self.pseudogenomes
-        for g in genomes:
-            g.analyze_positional_distribution(self.n_bins, self.ripley_d)
+        self.original.analyze_positional_distribution(self.n_bins, self.ripley_d)
+        for pg in self.pseudogenomes:
+            pg.analyze_positional_distribution(self.n_bins, self.ripley_d)
         # Set p-values
         self.set_pvalue('entropy', 'smaller')
         self.set_pvalue('norm_entropy', 'smaller')
