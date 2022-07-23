@@ -135,10 +135,14 @@ class MGE():
     def analyze_positional_distribution(self):
         ''' Sets the p-value for the statistics related to the positional
         distribution. '''
+        # Analyze original genome
         self.original.analyze_positional_distribution(self.n_bins, self.ripley_d)
+        # Analyze pseudogenomes considering the same number of hits
+        n_matches = self.original.n_sites
         for pg in self.pseudogenomes:
-            pg.analyze_positional_distribution(self.n_bins, self.ripley_d)
-        # Set p-values
+            pg.analyze_positional_distribution(self.n_bins, self.ripley_d,
+                                               n_top_scores=n_matches)
+        # Set p-value(s)
         self.set_pvalue('entropy', 'smaller')
         self.set_pvalue('norm_entropy', 'smaller')
         self.set_pvalue('gini', 'greater')
@@ -149,10 +153,13 @@ class MGE():
     
     def analyze_intergenicity(self):
         ''' Sets the p-value for the statistics related to the intergenicity. '''
-        genomes = [self.original] + self.pseudogenomes
-        for g in genomes:
-            g.analyze_intergenicity()
-        # Set p-values
+        # Analyze original genome
+        self.original.analyze_intergenicity()
+        # Analyze pseudogenomes considering the same number of hits
+        n_matches = self.original.n_sites
+        for g in self.pseudogenomes:
+            g.analyze_intergenicity(n_matches)
+        # Set p-value
         self.set_pvalue('intergenicity', 'greater')
     
     def set_pvalue(self, metric, alternative):

@@ -57,6 +57,8 @@ class MGE_TF():
             self.mge.analyze_positional_distribution()
             self.mge.analyze_intergenicity()
             self.compile_motif_specific_vals(stats)
+            # Ensure that only the report about the analysis with the original
+            # motif is saved
             if save_original_data:
                 filename_tag = m.name + '_' + self.mge.original.id
                 self.mge.original.save_report(filename_tag, outdir)

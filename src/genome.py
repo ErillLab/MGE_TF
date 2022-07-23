@@ -427,35 +427,37 @@ class Genome():
         # Site density (sites per thousand bp)
         self.site_density = 1000 * self.n_sites / self.length
         
-        # If the number of best scores to be considered for the positional
-        # distribution analysis was not specified, the hits (defined by the
-        # Patser threshold) are going to be used (therefore the number of best
-        # scores to be considered is the number of hits, i.e., self.n_sites).
-        if not n_top_scores:
-            if self.n_sites < 2:
-                n_top_scores = 2
-            else:
+        # Compute intergenicity
+        
+        # First define the positions of the matches to be analyzed
+        
+        if self.type == 'original':
+            if self.n_sites >= 2:
+                # On the original genome, use the hits (defined by the Patser threshold)
                 n_top_scores = self.n_sites
+            else:
+                # But if there are < 2 hits, consider the best 2 matches
+                n_top_scores = 2
+        
+        elif self.type == 'pseudogenome':
+            # Consider the best n matches as specified by n_top_scores.
+            # If not specified, use the hits of the pseudogenome (which may be
+            # less or more numerous than the hits on the original genome!)
+            if n_top_scores == None:
+                n_top_scores = self.n_sites
+            # If specified but lower than 2, consider the best 2 matches
+            elif n_top_scores < 2:
+                n_top_scores = 2
         
         if n_top_scores == self.n_sites:
+            # the positions were already computed and stored in self.hits
             positions = self.hits['positions']
-        else:            
+        else:
+            # find the positions of the n top matches
             positions = np.argpartition(
                 self.pssm_scores['combined'], -n_top_scores)[-n_top_scores:]
         
-        
-        
-        '''
-        if self.n_sites < 3:  # !!! Make it a parameter (from config file?)
-            self.entropy = 'not_enough_sites'
-            self.norm_entropy = 'not_enough_sites'
-            self.gini = 'not_enough_sites'
-            self.norm_gini = 'not_enough_sites'
-            self.evenness = 'not_enough_sites'
-            self.new_evenness = 'not_enough_sites'
-            self.ripleyl = 'not_enough_sites'
-        '''
-        
+        # Now analyze positional distribution of the matches at those positions.
         
         # Set counts (regular binning and shifted binning)
         self.set_counts(positions, n_bins, use_double_binning)
@@ -652,7 +654,7 @@ class Genome():
             for hit_pos in self.hits['positions']:
                 self.hits['intergenic'].append(self.is_intergenic(hit_pos))
     
-    def analyze_intergenicity(self):
+    def analyze_intergenicity_old(self):
         
         if not self.hits:
             raise TypeError(
@@ -674,6 +676,71 @@ class Genome():
             n_intergenic = sum(self.hits['intergenic'])
             # Intergenic frequency
             intergenic_freq = n_intergenic / self.n_sites
+            # Set intergenicity attribute
+            self.intergenicity = intergenic_freq
+    
+    def analyze_intergenicity(self, n_top_scores=None):
+        
+        if not self.hits:
+            raise TypeError(
+                "The 'hits' attribute is 'NoneType'. Make sure you call the\
+                'scan' method specifying a threshold to get PSSM-hits before\
+                calling 'get_intergenicity'.")
+        
+        # Identify genetic context for each hit
+        self.set_hits_intergenic()
+        
+        # Compute intergenicity
+        
+        # First define the positions of the matches to be analyzed
+        
+        if self.type == 'original':
+            if self.n_sites >= 2:
+                # On the original genome, use the hits (defined by the Patser threshold)
+                n_top_scores = self.n_sites
+            else:
+                # But if there are < 2 hits, consider the best 2 matches
+                n_top_scores = 2
+
+        elif self.type == 'pseudogenome':
+            # Consider the best n matches as specified by n_top_scores.
+            # If not specified, use the hits of the pseudogenome (which may be
+            # less or more numerous than the hits on the original genome!)
+            if n_top_scores == None:
+                n_top_scores = self.n_sites
+            # If specified but lower than 2, consider the best 2 matches
+            elif n_top_scores < 2:
+                n_top_scores = 2
+        
+        if n_top_scores == self.n_sites:
+            # the positions were already computed and stored in self.hits
+            positions = self.hits['positions']
+        else:
+            # find the positions of the n top matches
+            positions = np.argpartition(
+                self.pssm_scores['combined'], -n_top_scores)[-n_top_scores:]
+        
+        # Now compute intergenicity of the matches at those positions.
+        
+        if len(positions) == 0:
+            # This could happen for pseudogenomes if the n_top_scores parameter
+            # is not used
+            self.intergenicity = 'no_sites'
+        
+        elif sum(self.genomic_units['coding']) == 0:
+            # This could happen in the case of non-annotated MGEs
+            self.intergenicity = 'no_genes'
+        
+        else:
+            # There are both matches and genes, so we can compute intergenicity
+            intergenicity_list = []
+            for pos in positions:
+                intergenicity_list.append(self.is_intergenic(pos))
+            
+            # Count number of intergenic sites
+            n_intergenic = sum(intergenicity_list)
+            # Intergenic frequency
+            intergenic_freq = n_intergenic / len(positions)
             # Set intergenicity attribute
             self.intergenicity = intergenic_freq
     
